@@ -1,3 +1,4 @@
+import logging
 import os
 
 import cv2 as cv
@@ -14,12 +15,166 @@ def splitfn(fn):
     return path, name, ext
 
 
-KONST = 0
+class Calibrator:
+    def __init__(self, pattern_size=(7, 6), square_size=1.0, debug_dir=None):
+        self.pattern_size = pattern_size
+        self.square_size = square_size
+        self.size = None
+
+        self.pattern_points = np.zeros((np.prod(self.pattern_size), 3), np.float32)
+        self.pattern_points[:, :2] = np.indices(self.pattern_size).T.reshape(-1, 2)
+        self.pattern_points *= self.square_size
+
+        self.debug_dir = debug_dir
+        self.log = logging.getLogger(self.__class__.__name__)
+
+    @property
+    def h(self):
+        return self.size[0]
+
+    @property
+    def w(self):
+        return self.size[1]
+
+    @property
+    def size_wh(self):
+        return self.size[::-1]
+
+    def calibrate_single_camera(self, chessboards):
+
+        obj_points = []
+        img_points = []
+
+        for (corners, pattern_points) in [x for x in chessboards if x is not None]:
+            img_points.append(corners)
+            obj_points.append(pattern_points)
+
+        rms, mtx_l, dstc_l, rvecs, tvecs = cv.calibrateCamera(obj_points, img_points,
+                                                              self.size_wh, None, None)
+        return img_points, obj_points, rms, mtx_l, dstc_l, rvecs, tvecs
+
+    def processImage(self, img, image_id=None):
+        if img is None:
+            return None
+
+        assert self.w == img.shape[1] and self.h == img.shape[0], (
+                "size: %d x %d ... " % (img.shape[1], img.shape[0]))
+        found, corners = cv.findChessboardCorners(img, self.pattern_size)
+        if found:
+            term = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_COUNT, 30, 0.1)
+            cv.cornerSubPix(img, corners, (5, 5), (-1, -1), term)
+
+        if self.debug_dir and image_id:
+            vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+            cv.drawChessboardCorners(vis, self.pattern_size, corners, found)
+            outfile = os.path.join(self.debug_dir, image_id + '_chess.png')
+            cv.imwrite(outfile, vis)
+
+        if not found:
+            self.log.debug('chessboard not found {}'.format(image_id))
+            return None
+
+        return (corners.reshape(-1, 2), self.pattern_points)
+
+    def stereo_calibrate(self, dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r, obj_points):
+        flags = cv.CALIB_FIX_INTRINSIC
+        T = np.zeros((3, 1), dtype=np.float64)
+        R = np.eye(3, dtype=np.float64)
+        retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = cv.stereoCalibrate(
+            obj_points,
+            imgp_l,
+            imgp_r,
+            mtx_l,
+            dstm_l,
+            mtx_r,
+            dstm_r,
+            self.size_wh,
+            R,
+            T,
+            flags=flags
+        )
+        return E, F, R, T, retval
+
+    def calibrate(self, double_frame_generator):
+
+        count = 0;
+        self.size = None
+        chessboards = list()
+        for img_left, img_right in double_frame_generator:
+            if self.size is None:
+                self.size = img_left.shape[:2]
+
+            chssbrd_l = self.processImage(img_left, "l_{:2}".format(count))
+            chssbrd_r = self.processImage(img_right, "r_{:2}".format(count))
+            count += 1
+            if chssbrd_r is not None and chssbrd_l is not None:
+                chessboards.append((chssbrd_l, chssbrd_r))
+
+        imgp_l, obj_points, rms_l, mtx_l, dstm_l, rvecs_l, tvecs_l = \
+            self.calibrate_single_camera([l for l, r in chessboards])
+        imgp_r, obj_points, rms_r, mtx_r, dstm_r, rvecs_r, tvecs_r = \
+            self.calibrate_single_camera([r for l, r in chessboards])
+
+        E, F, R, T, retval = self.stereo_calibrate(dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r,
+                                                   obj_points)
+
+        self.log.debug("\nretval:{}".format(retval))
+        self.log.debug("R:\n{}".format(R))
+        self.log.debug("T:\n{}".format(T))
+        self.log.debug("E:\n{}".format(E))
+        self.log.debug("F:\n{}".format(F))
+
+        newImageSize = (int(self.w * 1), int(self.h * 1))
+        R_l, R_r, P_l, P_r, Q, roi1, roi2 = \
+            cv.stereoRectify(mtx_l, dstm_l,
+                             mtx_r, dstm_l,
+                             self.size_wh, R, T,
+                             flags=cv.CALIB_ZERO_DISPARITY,
+                             alpha=1,
+                             newImageSize=newImageSize
+                             )
+        self.log.debug("R_l:\n{}".format(R_l))
+        self.log.debug("R_r:\n{}".format(R_r))
+        self.log.debug("P_l:\n{}".format(P_l))
+        self.log.debug("P_r:\n{}".format(P_r))
+        self.log.debug("Q:\n{}".format(Q))
+        self.log.debug("roi1:\n{}".format(roi1))
+        self.log.debug("roi2:\n{}".format(roi2))
+
+        mapx_l, mapy_l = cv.initUndistortRectifyMap(mtx_l, dstm_l, R_l, P_l, newImageSize, cv.CV_16SC2)
+        mapx_r, mapy_r = cv.initUndistortRectifyMap(mtx_r, dstm_r, R_r, P_r, newImageSize, cv.CV_16SC2)
+
+        self.log.debug("mapx_l:\n{}".format(mapx_l))
+        self.log.debug("mapy_l:\n{}".format(mapy_l))
+        self.log.debug("mapx_r:\n{}".format(mapx_r))
+        self.log.debug("mapy_r:\n{}".format(mapy_r))
+
+        return mapx_l, mapy_l, mapx_r, mapy_r, Q
+
+
+class Rectifier:
+
+    def __init__(self, mapx_l, mapy_l, mapx_r, mapy_r):
+        self.mapx_l = mapx_l
+        self.mapy_l = mapy_l
+        self.mapx_r = mapx_r
+        self.mapy_r = mapy_r
+
+    def rectify(self, img_l, img_r):
+        stereo_undist_l = cv.remap(img_l, self.mapx_l, self.mapy_l, cv.INTER_LINEAR)
+        stereo_undist_r = cv.remap(img_r, self.mapx_r, self.mapy_r, cv.INTER_LINEAR)
+
+        return stereo_undist_l, stereo_undist_r
+
+
+def file_double_image_generator(imgs_left, imgs_right):
+    for fn_l, fn_r in zip(imgs_left, imgs_right):
+        img_l = cv.cvtColor(cv.imread(fn_l), cv.COLOR_BGR2GRAY)
+        img_r = cv.cvtColor(cv.imread(fn_r), cv.COLOR_BGR2GRAY)
+        yield img_l, img_r
 
 
 def main():
-    pattern_size = (9, 6)
-
     args, img_names = getopt.getopt(sys.argv[1:], '', ['debug=', 'square_size=', 'threads='])
 
     args = dict(args)
@@ -33,157 +188,31 @@ def main():
 
     imgs_left = sorted(glob(img_names[0]))
     imgs_right = sorted(glob(img_names[1]))
-
-    h, w = cv.imread(imgs_left[0], cv.IMREAD_GRAYSCALE).shape[:2]
-
-    imgp_l, obj_points, rms_l, mtx_l, dstm_l, rvecs_l, tvecs_l = \
-        calibrate_single_camera(imgs_left,
-                                pattern_size,
-                                square_size,
-                                debug_dir=debug_dir,
-                                threads_num=threads_num
-                                )
-    imgp_r, obj_points, rms_r, mtx_r, dstm_r, rvecs_r, tvecs_r = \
-        calibrate_single_camera(imgs_right,
-                                pattern_size,
-                                square_size,
-                                debug_dir=debug_dir,
-                                threads_num=threads_num
-                                )
-
-    E, F, R, T, retval = stereo_calibrate(dstm_l, dstm_r, h, imgp_l, imgp_r, mtx_l, mtx_r,
-                                          obj_points, w)
-
-    print("\nretval:", retval)
-    print("R:\n", R)
-    print("T:\n", T)
-    print("E:\n", E)
-    print("F:\n", F)
-
-    newImageSize = (int(w*1.3), int(h*1.3))
-    R_l, R_r, P_l, P_r, Q, roi1, roi2 = \
-        cv.stereoRectify(mtx_l, dstm_l,
-                         mtx_r, dstm_l,
-                         (w, h), R, T,
-                         flags=cv.CALIB_ZERO_DISPARITY,
-                         alpha=0,
-                         newImageSize=newImageSize
-                         )
-    print("R_l:\n", R_l)
-    print("R_r:\n", R_r)
-    print("P_l:\n", P_l)
-    print("P_r:\n", P_r)
-    print("Q:\n", Q)
-    np.savetxt("q.np",Q)
-    print("roi1:\n", roi1)
-    print("roi2:\n", roi2)
-
-    mapx_l, mapy_l = cv.initUndistortRectifyMap(mtx_l, dstm_l, R_l, P_l, newImageSize, cv.CV_16SC2)
-    mapx_r, mapy_r = cv.initUndistortRectifyMap(mtx_r, dstm_r, R_r, P_r, newImageSize, cv.CV_16SC2)
-
-    print("mapx_l:\n", mapx_l)
-    print("mapy_l:\n", mapy_l)
-    print("mapx_r:\n", mapx_r)
-    print("mapy_r:\n", mapy_r)
-
-    for file_name_l, file_name_r in zip(imgs_left,imgs_right):
-        newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx_l, dstm_l, (w, h), 1, (w, h))
-        undistort_and_write(debug_dir, file_name_l, mapx_l, mapy_l, newcameramtx, mtx_l, dstm_l)
-        newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx_r, dstm_r, (w, h), 1, (w, h))
-        undistort_and_write(debug_dir, file_name_r, mapx_r, mapy_r, newcameramtx, mtx_r, dstm_r)
-
-        cv.waitKey(0)
-
-
-
-def undistort_and_write(debug_dir, file_name, mapx, mapy, newcameramtx, mtx, dst_coeff):
-    frame = cv.imread(file_name)
-    stereo_undist = cv.remap(frame, mapx, mapy, cv.INTER_LINEAR)
-    single_undist = cv.undistort(frame, mtx, dst_coeff, None, newcameramtx)
-
     if debug_dir:
-        _path, name, _ext = splitfn(file_name)
-        outfile_st_undist = os.path.join(debug_dir, name + '_st_und.png')
-        cv.imwrite(outfile_st_undist, stereo_undist)
-        cv.imshow(name[:-2],stereo_undist)
+        logging.basicConfig(level=logging.DEBUG)
 
-        outfile_single_undist = os.path.join(debug_dir, name + '_single_und.png')
-        cv.imwrite(outfile_single_undist, single_undist)
+    gen = file_double_image_generator(imgs_left, imgs_right)
 
+    calibrator = Calibrator(square_size=square_size, debug_dir=debug_dir)
 
-def stereo_calibrate(dstm_l, dstm_r, h, imgp_l, imgp_r, mtx_l, mtx_r, obj_points, w):
-    flags = cv.CALIB_FIX_INTRINSIC
-    T = np.zeros((3, 1), dtype=np.float64)
-    R = np.eye(3, dtype=np.float64)
-    retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = cv.stereoCalibrate(
-        obj_points,
-        imgp_l,
-        imgp_r,
-        mtx_l,
-        dstm_l,
-        mtx_r,
-        dstm_r,
-        (w, h),
-        R,
-        T,
-        flags=flags
-    )
-    return E, F, R, T, retval
+    mapx_l, mapy_l, mapx_r, mapy_r, Q = calibrator.calibrate(gen)
 
+    np.savetxt("q.txt", Q)
+    np.save("q.npy", Q)
+    np.save("mapx_l.npy", mapx_l)
+    np.save("mapy_l.npy", mapy_l)
+    np.save("mapx_r.npy", mapx_r)
+    np.save("mapy_r.npy", mapy_r)
 
-def calibrate_single_camera(img_names, pattern_size, square_size, debug_dir=None, threads_num=1):
-    pattern_points = np.zeros((np.prod(pattern_size), 3), np.float32)
-    pattern_points[:, :2] = np.indices(pattern_size).T.reshape(-1, 2)
-    pattern_points *= square_size
+    rectifier = Rectifier(mapx_l, mapy_l, mapx_r, mapy_r)
 
-    obj_points = []
-    img_points = []
-    h, w = cv.imread(img_names[0], cv.IMREAD_GRAYSCALE).shape[
-           :2]  # TODO: use imquery call to retrieve results
-
-    def processImage(file_name):
-        print('processing %s... ' % file_name)
-        img = cv.imread(file_name, 0)
-        if img is None:
-            print("Failed to load", file_name)
-            return None
-
-        assert w == img.shape[1] and h == img.shape[0], (
-                "size: %d x %d ... " % (img.shape[1], img.shape[0]))
-        found, corners = cv.findChessboardCorners(img, pattern_size)
-        if found:
-            term = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_COUNT, 30, 0.1)
-            cv.cornerSubPix(img, corners, (5, 5), (-1, -1), term)
-
-        if debug_dir:
-            vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
-            cv.drawChessboardCorners(vis, pattern_size, corners, found)
-            _path, name, _ext = splitfn(file_name)
-            outfile = os.path.join(debug_dir, name + '_chess.png')
-            cv.imwrite(outfile, vis)
-
-        if not found:
-            print('chessboard not found')
-            return None
-
-        print('           %s... OK' % file_name)
-        return (corners.reshape(-1, 2), pattern_points)
-
-    if threads_num <= 1:
-        chessboards = [processImage(fn) for fn in img_names]
-    else:
-        print("Run with %d threads..." % threads_num)
-        from multiprocessing.dummy import Pool as ThreadPool
-        pool = ThreadPool(threads_num)
-        chessboards = pool.map(processImage, img_names)
-    chessboards = [x for x in chessboards if x is not None]
-    for (corners, pattern_points) in chessboards:
-        img_points.append(corners)
-        obj_points.append(pattern_points)
-
-    rms, mtx_l, dstc_l, rvecs, tvecs = cv.calibrateCamera(obj_points, img_points,
-                                                          (w, h), None, None)
-    return img_points, obj_points, rms, mtx_l, dstc_l, rvecs, tvecs
+    for img_l, img_r in file_double_image_generator(imgs_left, imgs_right):
+        rect_l, rect_r = rectifier.rectify(img_l, img_r)
+        cv.imshow("left_orig", img_l)
+        cv.imshow("right_orig", img_r)
+        cv.imshow("left", rect_l)
+        cv.imshow("right", rect_r)
+        cv.waitKey(0)
 
 
 if __name__ == '__main__':
