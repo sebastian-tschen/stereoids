@@ -1,6 +1,6 @@
 import os
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
 VERSION = open(os.path.join(here, 'VERSION.txt')).read()
@@ -13,7 +13,7 @@ REQUIREMENTS = [
 setup(
     name='stereoids',
     version=VERSION,
-    packages=['detector', 'corrector', 'stereoids'],
+    packages=find_packages(),
     url='https://github.com/sebastian-tschen/stereoids',
     license='MIT',
     author='Sebastian Behrens',
