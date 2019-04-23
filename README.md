@@ -1,2 +1,2 @@
-# stereo
-a sandbox project for stereo computer vision with aruco markers
+# stereoids
+a simple library for stereo computer vision with (aruco) markers
