@@ -8,6 +8,8 @@ import sys
 import getopt
 from glob import glob
 
+from stereoids import mkdir_p
+
 
 def splitfn(fn):
     path, fn = os.path.split(fn)
@@ -65,6 +67,7 @@ class Calibrator:
             cv.cornerSubPix(img, corners, (5, 5), (-1, -1), term)
 
         if self.debug_dir and image_id:
+            mkdir_p(self.debug_dir)
             vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
             cv.drawChessboardCorners(vis, self.pattern_size, corners, found)
             outfile = os.path.join(self.debug_dir, image_id + '_chess.png')
@@ -104,8 +107,8 @@ class Calibrator:
             if self.size is None:
                 self.size = img_left.shape[:2]
 
-            chssbrd_l = self._processImage(img_left, "l_{:2}".format(count))
-            chssbrd_r = self._processImage(img_right, "r_{:2}".format(count))
+            chssbrd_l = self._processImage(img_left, "l_{:02}".format(count))
+            chssbrd_r = self._processImage(img_right, "r_{:02}".format(count))
             count += 1
             if chssbrd_r is not None and chssbrd_l is not None:
                 chessboards.append((chssbrd_l, chssbrd_r))
@@ -115,10 +118,13 @@ class Calibrator:
         imgp_r, obj_points, rms_r, mtx_r, dstm_r, rvecs_r, tvecs_r = \
             self._calibrate_single_camera([r for l, r in chessboards])
 
+        self.log.debug("rms_l:\n{}".format(rms_l))
+        self.log.debug("rms_r:\n{}".format(rms_r))
+
         E, F, R, T, retval = self._stereo_calibrate(dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r,
                                                     obj_points)
 
-        self.log.debug("\nretval:{}".format(retval))
+        self.log.debug("\nretval: {}".format(retval))
         self.log.debug("R:\n{}".format(R))
         self.log.debug("T:\n{}".format(T))
         self.log.debug("E:\n{}".format(E))
@@ -181,7 +187,7 @@ def main():
 
     args = dict(args)
     args.setdefault('--debug', './output/')
-    args.setdefault('--square_size', 1.0)
+    args.setdefault('--square_size', 25.3 / 7.0)
     args.setdefault('--threads', 4)
 
     square_size = float(args.get('--square_size'))
@@ -195,7 +201,7 @@ def main():
 
     gen = file_double_image_generator(imgs_left, imgs_right)
 
-    calibrator = Calibrator(square_size=square_size, debug_dir=debug_dir)
+    calibrator = Calibrator(pattern_size=(7, 6), square_size=square_size, debug_dir=debug_dir)
 
     mapx_l, mapy_l, mapx_r, mapy_r, Q = calibrator.calibrate(gen)
 
