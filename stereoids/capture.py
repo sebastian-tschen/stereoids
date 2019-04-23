@@ -29,8 +29,8 @@ class Capture():
             if key == ord('q'):
                 break
             if key == ord('t'):
-                outfile_l = os.path.join(self.outdir, self.prefix + 'left_{:2}.png'.format(capture_count))
-                outfile_r = os.path.join(self.outdir, self.prefix + 'right_{:2}.png'.format(capture_count))
+                outfile_l = os.path.join(self.outdir, self.prefix + 'left_{:02}.png'.format(capture_count))
+                outfile_r = os.path.join(self.outdir, self.prefix + 'right_{:02}.png'.format(capture_count))
 
                 cv.imwrite(outfile_l, img_l)
                 cv.imwrite(outfile_r, img_r)
