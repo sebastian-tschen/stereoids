@@ -1,15 +1,18 @@
+import os
+
 from setuptools import setup
 
+here = os.path.abspath(os.path.dirname(__file__))
+VERSION = open(os.path.join(here, 'VERSION.txt')).read()
 
 REQUIREMENTS = [
     'opencv-contrib-python',
     'numpy',
 ]
 
-
 setup(
     name='stereoids',
-    version='0.0.2',
+    version=VERSION,
     packages=['detector', 'corrector', 'stereoids'],
     url='https://github.com/sebastian-tschen/stereoids',
     license='MIT',
