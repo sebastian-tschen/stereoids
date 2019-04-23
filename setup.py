@@ -9,7 +9,7 @@ REQUIREMENTS = [
 
 setup(
     name='stereoids',
-    version='0.0.1',
+    version='0.0.2',
     packages=['detector', 'corrector', 'stereoids'],
     url='https://github.com/sebastian-tschen/stereoids',
     license='MIT',

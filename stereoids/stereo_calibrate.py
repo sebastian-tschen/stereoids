@@ -40,7 +40,7 @@ class Calibrator:
     def size_wh(self):
         return self.size[::-1]
 
-    def calibrate_single_camera(self, chessboards):
+    def _calibrate_single_camera(self, chessboards):
 
         obj_points = []
         img_points = []
@@ -53,7 +53,7 @@ class Calibrator:
                                                               self.size_wh, None, None)
         return img_points, obj_points, rms, mtx_l, dstc_l, rvecs, tvecs
 
-    def processImage(self, img, image_id=None):
+    def _processImage(self, img, image_id=None):
         if img is None:
             return None
 
@@ -76,7 +76,7 @@ class Calibrator:
 
         return (corners.reshape(-1, 2), self.pattern_points)
 
-    def stereo_calibrate(self, dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r, obj_points):
+    def _stereo_calibrate(self, dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r, obj_points):
         flags = cv.CALIB_FIX_INTRINSIC
         T = np.zeros((3, 1), dtype=np.float64)
         R = np.eye(3, dtype=np.float64)
@@ -104,19 +104,19 @@ class Calibrator:
             if self.size is None:
                 self.size = img_left.shape[:2]
 
-            chssbrd_l = self.processImage(img_left, "l_{:2}".format(count))
-            chssbrd_r = self.processImage(img_right, "r_{:2}".format(count))
+            chssbrd_l = self._processImage(img_left, "l_{:2}".format(count))
+            chssbrd_r = self._processImage(img_right, "r_{:2}".format(count))
             count += 1
             if chssbrd_r is not None and chssbrd_l is not None:
                 chessboards.append((chssbrd_l, chssbrd_r))
 
         imgp_l, obj_points, rms_l, mtx_l, dstm_l, rvecs_l, tvecs_l = \
-            self.calibrate_single_camera([l for l, r in chessboards])
+            self._calibrate_single_camera([l for l, r in chessboards])
         imgp_r, obj_points, rms_r, mtx_r, dstm_r, rvecs_r, tvecs_r = \
-            self.calibrate_single_camera([r for l, r in chessboards])
+            self._calibrate_single_camera([r for l, r in chessboards])
 
-        E, F, R, T, retval = self.stereo_calibrate(dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r,
-                                                   obj_points)
+        E, F, R, T, retval = self._stereo_calibrate(dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r,
+                                                    obj_points)
 
         self.log.debug("\nretval:{}".format(retval))
         self.log.debug("R:\n{}".format(R))
@@ -141,8 +141,10 @@ class Calibrator:
         self.log.debug("roi1:\n{}".format(roi1))
         self.log.debug("roi2:\n{}".format(roi2))
 
-        mapx_l, mapy_l = cv.initUndistortRectifyMap(mtx_l, dstm_l, R_l, P_l, newImageSize, cv.CV_16SC2)
-        mapx_r, mapy_r = cv.initUndistortRectifyMap(mtx_r, dstm_r, R_r, P_r, newImageSize, cv.CV_16SC2)
+        mapx_l, mapy_l = cv.initUndistortRectifyMap(mtx_l, dstm_l, R_l, P_l, newImageSize,
+                                                    cv.CV_16SC2)
+        mapx_r, mapy_r = cv.initUndistortRectifyMap(mtx_r, dstm_r, R_r, P_r, newImageSize,
+                                                    cv.CV_16SC2)
 
         self.log.debug("mapx_l:\n{}".format(mapx_l))
         self.log.debug("mapy_l:\n{}".format(mapy_l))

@@ -16,18 +16,6 @@ class Capture():
         cap_left = cv.VideoCapture(self.dev_l)
         cap_right = cv.VideoCapture(self.dev_r)
 
-        # window_height = 960
-        # window_width = 1280
-
-        # cap_left.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*"MJPG"))
-        # cap_right.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*"MJPG"))
-        # cap_left.set(cv.CAP_PROP_FRAME_WIDTH, window_width)  # capture_width
-        # cap_left.set(cv.CAP_PROP_FRAME_HEIGHT, window_height)  # capture_height
-        # cap_right.set(cv.CAP_PROP_FRAME_WIDTH, window_width)
-        # cap_right.set(cv.CAP_PROP_FRAME_HEIGHT, window_height)
-        # cap_left.set(cv.CAP_PROP_FPS, 60)  # high framerate for sharp images without blur (even if we only grab 5 fps)
-        # cap_right.set(cv.CAP_PROP_FPS, 60)
-
         capture_count = 0
         while 1:
             ret_l, img_l = cap_left.read()
