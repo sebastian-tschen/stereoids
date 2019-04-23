@@ -1,21 +1,21 @@
 # stereoids
 a simple library for stereo computer vision with (aruco) markers
 
-installation
----
+## installation
+
 
 `pip install stereoids`
 
-usage examples
-----
+## usage examples
 
-###calibration
+
+### calibration
 calibration happens via a set of stereo pair images of a chessboard pattern (see _data_ directory)
 the capture module will create such images, the stereo_calibrate module processes them and creates a set 
 of calibration files for transformation image transformation and a disparity to depth matrix Q.
 
 
-####create calibration images
+#### create calibration images
 
 
 ```python
@@ -30,7 +30,7 @@ capture.start()
 - to finish capture process press 'q'
 
 
-####calibrate camera pair
+#### calibrate camera pair
 
 ```python
 
@@ -65,7 +65,7 @@ parameters and return values of `Calibrator`:
 - Q: disparity to depth mapping
 
 
-###locating markers in space
+### locating markers in space
 
 the marker_locate module is responsible for locating markers in 3d space. It requires at a minimum 
 a disparity to depth mapping (Q) and a marker-locator to locate markers in images and map them to 3D space. 
