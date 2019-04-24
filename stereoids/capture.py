@@ -22,8 +22,10 @@ class Capture():
 
         capture_count = self.index_start
         while 1:
-            ret_l, img_l = cap_left.read()
-            ret_r, img_r = cap_right.read()
+            cap_left.grab()
+            cap_right.grab()
+            ret_l, img_l = cap_left.retrieve()
+            ret_r, img_r = cap_right.retrieve()
 
             if self.pattern_size:
                 img_bw_l = cv.cvtColor(img_l, cv.COLOR_BGR2GRAY)

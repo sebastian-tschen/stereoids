@@ -93,8 +93,10 @@ def img_generator(l, r):
     cap_l = cv.VideoCapture(l)
     cap_r = cv.VideoCapture(r)
     while True:
-        ret_l, img_l = cap_l.read()
-        ret_r, img_r = cap_r.read()
+        cap_l.grab()
+        cap_r.grab()
+        ret_l, img_l = cap_l.retrieve()
+        ret_r, img_r = cap_r.retrieve()
         img_l = cv.cvtColor(img_l, cv.COLOR_BGR2GRAY)
         img_r = cv.cvtColor(img_r, cv.COLOR_BGR2GRAY)
         yield img_l, img_r
