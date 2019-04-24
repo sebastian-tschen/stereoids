@@ -42,6 +42,12 @@ class Calibrator:
     def size_wh(self):
         return self.size[::-1]
 
+    def print_camera_values(self, mtx_l, postfix=""):
+        fovx, fovy, focalLength, principalPoint, aspectRatio = \
+            cv.calibrationMatrixValues(mtx_l, self.size_wh, self.w, self.h)
+
+        self.log.debug("fov_x{}: {}\nfov_y{}: {}".format(postfix, fovx, postfix, fovy))
+
     def _calibrate_single_camera(self, chessboards):
 
         obj_points = []
@@ -122,6 +128,9 @@ class Calibrator:
         self.log.debug("rms_r:\n{}".format(rms_r))
         self.log.debug("mtx_l:\n{}".format(mtx_l))
         self.log.debug("mtx_r:\n{}".format(mtx_r))
+        self.print_camera_values(mtx_l, postfix="_l")
+        self.print_camera_values(mtx_r, postfix="_r")
+        self.log.debug()
 
         E, F, R, T, retval = self._stereo_calibrate(dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r,
                                                     obj_points)
