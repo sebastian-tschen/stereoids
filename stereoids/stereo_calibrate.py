@@ -130,7 +130,6 @@ class Calibrator:
         self.log.debug("mtx_r:\n{}".format(mtx_r))
         self.print_camera_values(mtx_l, postfix="_l")
         self.print_camera_values(mtx_r, postfix="_r")
-        self.log.debug()
 
         E, F, R, T, retval = self._stereo_calibrate(dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r,
                                                     obj_points)
@@ -212,7 +211,7 @@ def main():
 
     gen = file_double_image_generator(imgs_left, imgs_right)
 
-    calibrator = Calibrator(pattern_size=(7, 6), square_size=square_size, debug_dir=debug_dir)
+    calibrator = Calibrator(pattern_size=(9, 6), square_size=square_size, debug_dir=debug_dir)
 
     mapx_l, mapy_l, mapx_r, mapy_r, Q = calibrator.calibrate(gen)
 
