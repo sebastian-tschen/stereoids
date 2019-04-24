@@ -88,6 +88,8 @@ class Locator:
                 marker_disparity = calculate_marker_disparity(marker_pairs)
                 marker_positions = self.calculate_marker_positions(marker_disparity)
                 callback(marker_positions)
+            else:
+                callback({})
 
 
 def main():
