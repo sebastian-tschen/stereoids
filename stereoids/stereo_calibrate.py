@@ -120,6 +120,8 @@ class Calibrator:
 
         self.log.debug("rms_l:\n{}".format(rms_l))
         self.log.debug("rms_r:\n{}".format(rms_r))
+        self.log.debug("mtx_l:\n{}".format(mtx_l))
+        self.log.debug("mtx_r:\n{}".format(mtx_r))
 
         E, F, R, T, retval = self._stereo_calibrate(dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r,
                                                     obj_points)
