@@ -197,7 +197,7 @@ def main():
 
     args = dict(args)
     args.setdefault('--debug', './output/')
-    args.setdefault('--square_size', 25.3 / 7.0)
+    args.setdefault('--square_size', 1)
     args.setdefault('--threads', 4)
 
     square_size = float(args.get('--square_size'))
@@ -211,7 +211,7 @@ def main():
 
     gen = file_double_image_generator(imgs_left, imgs_right)
 
-    calibrator = Calibrator(pattern_size=(9, 6), square_size=square_size, debug_dir=debug_dir)
+    calibrator = Calibrator(pattern_size=(6, 9), square_size=square_size, debug_dir=debug_dir)
 
     mapx_l, mapy_l, mapx_r, mapy_r, Q = calibrator.calibrate(gen)
 

@@ -18,7 +18,10 @@ def find_unique_markers(marker_ids, corners):
 
         int_marker_id = int(marker_id)
         if int_marker_id in seen_ids:
-            unique_markers.pop(int_marker_id)
+            try:
+                unique_markers.pop(int_marker_id)
+            except KeyError:
+                pass
         else:
             seen_ids.add(int_marker_id)
             unique_markers[int_marker_id] = corners[i]

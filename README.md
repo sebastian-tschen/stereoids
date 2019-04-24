@@ -1,5 +1,5 @@
 # stereoids
-a simple library for stereo computer vision with (aruco) markers
+a simple library for computer stereo vision with (aruco) markers
 
 ## installation
 
