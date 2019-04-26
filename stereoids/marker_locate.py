@@ -10,16 +10,6 @@ from detector import Detector
 from detector.aruco import ArucoDetector
 
 
-def find_marker_pairs(ids_l, corners_l, ids_r, corners_r):
-    unique_l = find_unique_markers(ids_l, corners_l)
-    unique_r = find_unique_markers(ids_r, corners_r)
-
-    marker_pairs = {}
-    for id_l in unique_l:
-        if id_l in unique_r:
-            marker_pairs[id_l] = (unique_l[id_l], unique_r[id_l])
-
-    return marker_pairs
 
 
 def get_position_from_corners(corners):
@@ -41,7 +31,7 @@ def calculate_marker_disparity(marker_pairs):
 
 class Locator:
 
-    def __init__(self, Q, marker_detector: Detector, img_corrector: ImgCorrector = None, whitelist=None):
+    def init(self, Q, marker_detector: Detector, img_corrector: ImgCorrector = None, whitelist=None):
         self.Q = Q
         self.marker_detector = marker_detector
         self.img_corrector = img_corrector
@@ -52,7 +42,7 @@ class Locator:
 
         seen_ids = set()
         for i, marker_id in enumerate(marker_ids):
-            if (self.whitelist is not None) and (marker_id not in self.whitelist):
+            if (self.whitelist is not None) and (int(marker_id[0]) not in self.whitelist):
                 continue
             int_marker_id = int(marker_id)
             if int_marker_id in seen_ids:
@@ -64,6 +54,17 @@ class Locator:
                 seen_ids.add(int_marker_id)
                 unique_markers[int_marker_id] = corners[i]
         return unique_markers
+
+    def find_marker_pairs(self, ids_l, corners_l, ids_r, corners_r):
+        unique_l = self.find_unique_markers(ids_l, corners_l)
+        unique_r = self.find_unique_markers(ids_r, corners_r)
+
+        marker_pairs = {}
+        for id_l in unique_l:
+            if id_l in unique_r:
+                marker_pairs[id_l] = (unique_l[id_l], unique_r[id_l])
+
+        return marker_pairs
 
     def calculate_marker_positions(self, marker_disparity):
 
@@ -81,12 +82,13 @@ class Locator:
 
         for img_l, img_r in img_generator:
             ids_l, corners_l = self.marker_detector.detect(img_l)
-            if not ids_l.any or ((self.whitelist is not None) and not (self.whitelist & set(ids_l))):
+            if ids_l is None or (not ids_l.any()) or ((self.whitelist is not None) and not (self.whitelist & set([idx[0] for idx in ids_l]))):
+                callback({})
                 continue
             ids_r, corners_r = self.marker_detector.detect(img_r)
 
             if ids_l is not None and ids_r is not None:
-                marker_pairs = find_marker_pairs(ids_l, corners_l, ids_r, corners_r)
+                marker_pairs = self.find_marker_pairs(ids_l, corners_l, ids_r, corners_r)
                 marker_disparity = calculate_marker_disparity(marker_pairs)
                 marker_positions = self.calculate_marker_positions(marker_disparity)
                 callback(marker_positions)
