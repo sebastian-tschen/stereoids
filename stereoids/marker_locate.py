@@ -31,7 +31,7 @@ def calculate_marker_disparity(marker_pairs):
 
 class Locator:
 
-    def init(self, Q, marker_detector: Detector, img_corrector: ImgCorrector = None, whitelist=None):
+    def __init__(self, Q, marker_detector: Detector, img_corrector: ImgCorrector = None, whitelist=None):
         self.Q = Q
         self.marker_detector = marker_detector
         self.img_corrector = img_corrector
