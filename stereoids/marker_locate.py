@@ -81,7 +81,7 @@ class Locator:
 
         for img_l, img_r in img_generator:
             ids_l, corners_l = self.marker_detector.detect(img_l)
-            if not self.whitelist & set(ids_l):
+            if not ids_l.any or ((self.whitelist is not None) and not (self.whitelist & set(ids_l))):
                 continue
             ids_r, corners_r = self.marker_detector.detect(img_r)
 
