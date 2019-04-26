@@ -1,6 +1,7 @@
 """This module will identify markers of a given type and try to position them in 3d space"""
 import argparse
 
+from multiprocessing import Pool
 import cv2 as cv
 import numpy as np
 
@@ -41,7 +42,6 @@ def find_marker_pairs(ids_l, corners_l, ids_r, corners_r):
 
 
 def get_position_from_corners(corners):
-
     return (corners[0][0] + corners[0][1] + corners[0][2] + corners[0][3]) / 4
 
 
@@ -64,6 +64,7 @@ class Locator:
         self.Q = Q
         self.marker_detector = marker_detector
         self.img_corrector = img_corrector
+        self.pool = Pool(2)
 
     def calculate_marker_positions(self, marker_disparity):
 
@@ -80,8 +81,12 @@ class Locator:
             img_generator = self.img_corrector.get_corrected_generator(img_generator)
 
         for img_l, img_r in img_generator:
-            ids_l, corners_l = self.marker_detector.detect(img_l)
-            ids_r, corners_r = self.marker_detector.detect(img_r)
+
+            res_l = self.pool.apply_async(self.marker_detector.detect, (img_l,))
+            res_r = self.pool.apply_async(self.marker_detector.detect, (img_r,))
+
+            ids_l, corners_l = res_l.get()
+            ids_r, corners_r = res_r.get()
 
             if ids_l is not None and ids_r is not None:
                 marker_pairs = find_marker_pairs(ids_l, corners_l, ids_r, corners_r)
