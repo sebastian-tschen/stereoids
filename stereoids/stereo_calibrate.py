@@ -146,7 +146,7 @@ class Calibrator:
                              mtx_r, dstm_l,
                              self.size_wh, R, T,
                              flags=cv.CALIB_ZERO_DISPARITY,
-                             alpha=1,
+                             alpha=0,
                              newImageSize=newImageSize
                              )
         self.log.debug("R_l:\n{}".format(R_l))
