@@ -85,10 +85,13 @@ class Calibrator:
 
         return (corners.reshape(-1, 2), self.pattern_points)
 
-    def _stereo_calibrate(self, dstm_l, dstm_r, mtx_l, mtx_r, chessboards_l, chessboards_r):
+    def _stereo_calibrate(self, dstm_l, dstm_r, mtx_l, mtx_r, chessboards):
         flags = cv.CALIB_FIX_INTRINSIC
         T = np.zeros((3, 1), dtype=np.float64)
         R = np.eye(3, dtype=np.float64)
+
+        chessboards_l = [ch_l for ch_l, ch_r in chessboards]
+        chessboards_r = [ch_r for ch_l, ch_r in chessboards]
 
         imgp_l = [corners for corners, pattern_points in chessboards_l]
         obj_points = [pattern_points for corners, pattern_points in chessboards_l]
@@ -122,6 +125,8 @@ class Calibrator:
 
             chssbrd_l = self._processImage(img_left, "l_{:02}".format(count))
             chssbrd_r = self._processImage(img_right, "r_{:02}".format(count))
+
+
             count += 1
             if chssbrd_l is not None:
                 chessboards_l.append(chssbrd_l)
@@ -130,10 +135,10 @@ class Calibrator:
             if chssbrd_r is not None and chssbrd_l is not None:
                 chessboards.append((chssbrd_l, chssbrd_r))
 
-        imgp_l, obj_points, rms_l, mtx_l, dstm_l, rvecs_l, tvecs_l = \
-            self._calibrate_single_camera([l for l, r in chessboards])
-        imgp_r, obj_points, rms_r, mtx_r, dstm_r, rvecs_r, tvecs_r = \
-            self._calibrate_single_camera([r for l, r in chessboards])
+        imgp_l, _, rms_l, mtx_l, dstm_l, rvecs_l, tvecs_l = \
+            self._calibrate_single_camera(chessboards_l)
+        imgp_r, _, rms_r, mtx_r, dstm_r, rvecs_r, tvecs_r = \
+            self._calibrate_single_camera(chessboards_r)
 
         self.log.debug("rms_l:\n{}".format(rms_l))
         self.log.debug("rms_r:\n{}".format(rms_r))
@@ -147,8 +152,7 @@ class Calibrator:
             dstm_r,
             mtx_l,
             mtx_r,
-            chessboards_l,
-            chessboards_r,
+            chessboards
         )
 
         self.log.debug("\nretval: {}".format(retval))
@@ -228,7 +232,7 @@ def main():
 
     gen = file_double_image_generator(imgs_left, imgs_right)
 
-    calibrator = Calibrator(pattern_size=(6, 9), square_size=square_size, debug_dir=debug_dir)
+    calibrator = Calibrator(pattern_size=(6, 7), square_size=square_size, debug_dir=debug_dir)
 
     mapx_l, mapy_l, mapx_r, mapy_r, Q = calibrator.calibrate(gen)
 

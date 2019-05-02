@@ -58,7 +58,7 @@ class Capture():
 
 
 def main():
-    capture = Capture(0, 2, pattern_size=(6, 7), index_start=21)
+    capture = Capture(2, 0)
     capture.start()
 
 
