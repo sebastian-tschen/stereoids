@@ -85,10 +85,15 @@ class Calibrator:
 
         return (corners.reshape(-1, 2), self.pattern_points)
 
-    def _stereo_calibrate(self, dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r, obj_points):
+    def _stereo_calibrate(self, dstm_l, dstm_r, mtx_l, mtx_r, chessboards_l, chessboards_r):
         flags = cv.CALIB_FIX_INTRINSIC
         T = np.zeros((3, 1), dtype=np.float64)
         R = np.eye(3, dtype=np.float64)
+
+        imgp_l = [corners for corners, pattern_points in chessboards_l]
+        obj_points = [pattern_points for corners, pattern_points in chessboards_l]
+        imgp_r = [corners for corners, pattern_points in chessboards_r]
+
         retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = cv.stereoCalibrate(
             obj_points,
             imgp_l,
@@ -109,6 +114,8 @@ class Calibrator:
         count = 0;
         self.size = None
         chessboards = list()
+        chessboards_l = list()
+        chessboards_r = list()
         for img_left, img_right in double_frame_generator:
             if self.size is None:
                 self.size = img_left.shape[:2]
@@ -116,6 +123,10 @@ class Calibrator:
             chssbrd_l = self._processImage(img_left, "l_{:02}".format(count))
             chssbrd_r = self._processImage(img_right, "r_{:02}".format(count))
             count += 1
+            if chssbrd_l is not None:
+                chessboards_l.append(chssbrd_l)
+            if chssbrd_r is not None:
+                chessboards_r.append(chssbrd_r)
             if chssbrd_r is not None and chssbrd_l is not None:
                 chessboards.append((chssbrd_l, chssbrd_r))
 
@@ -131,8 +142,14 @@ class Calibrator:
         self.print_camera_values(mtx_l, postfix="_l")
         self.print_camera_values(mtx_r, postfix="_r")
 
-        E, F, R, T, retval = self._stereo_calibrate(dstm_l, dstm_r, imgp_l, imgp_r, mtx_l, mtx_r,
-                                                    obj_points)
+        E, F, R, T, retval = self._stereo_calibrate(
+            dstm_l,
+            dstm_r,
+            mtx_l,
+            mtx_r,
+            chessboards_l,
+            chessboards_r,
+        )
 
         self.log.debug("\nretval: {}".format(retval))
         self.log.debug("R:\n{}".format(R))
@@ -224,13 +241,32 @@ def main():
 
     rectifier = Rectifier(mapx_l, mapy_l, mapx_r, mapy_r)
 
+    showimages = True;
+    index = 0
     for img_l, img_r in file_double_image_generator(imgs_left, imgs_right):
-        rect_l, rect_r = rectifier.rectify(img_l, img_r)
-        cv.imshow("left_orig", img_l)
-        cv.imshow("right_orig", img_r)
-        cv.imshow("left", rect_l)
-        cv.imshow("right", rect_r)
-        cv.waitKey(0)
+        if debug_dir:
+            rect_l, rect_r = rectifier.rectify(img_l, img_r)
+            img_id_l = "l_{:02}".format(index)
+            img_id_r = "r_{:02}".format(index)
+            outfile_orig_l = os.path.join(debug_dir, img_id_l + '_orig.png')
+            outfile_orig_r = os.path.join(debug_dir, img_id_r + '_orig.png')
+            outfile_l = os.path.join(debug_dir, img_id_l + '_rect.png')
+            outfile_r = os.path.join(debug_dir, img_id_r + '_rect.png')
+            cv.imwrite(outfile_orig_l, img_l)
+            cv.imwrite(outfile_orig_r, img_r)
+            cv.imwrite(outfile_l, rect_l)
+            cv.imwrite(outfile_r, rect_r)
+            index += 1
+
+        if showimages:
+            cv.imshow("left_orig", img_l)
+            cv.imshow("right_orig", img_r)
+            cv.imshow("left", rect_l)
+            cv.imshow("right", rect_r)
+            wait_key = cv.waitKey(0)
+            key = wait_key & 0xFF
+            if key == ord('q'):
+                showimages = False
 
 
 if __name__ == '__main__':
