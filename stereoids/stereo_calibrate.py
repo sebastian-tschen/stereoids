@@ -164,7 +164,7 @@ class Calibrator:
         newImageSize = (int(self.w * 1), int(self.h * 1))
         R_l, R_r, P_l, P_r, Q, roi1, roi2 = \
             cv.stereoRectify(mtx_l, dstm_l,
-                             mtx_r, dstm_l,
+                             mtx_r, dstm_r,
                              self.size_wh, R, T,
                              flags=cv.CALIB_ZERO_DISPARITY,
                              alpha=0,
